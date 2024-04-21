@@ -113,9 +113,21 @@ impl StatefulWidget for ScrollView {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let (mut x, mut y) = state.offset.into();
+
         // ensure that we don't scroll past the end of the buffer in either direction
+        // also, ensure that the scrolling stops with the end of the content at the
+        // bottom of the visible area
+        let max_y_offset = self.size.height - area.height;
+        let next_y_offset = y.min(self.buf.area.height.saturating_sub(1));
+        let y_offset = if next_y_offset > max_y_offset {
+            max_y_offset
+        } else {
+            next_y_offset
+        };
+
         x = x.min(self.buf.area.width.saturating_sub(1));
-        y = y.min(self.buf.area.height.saturating_sub(1));
+        y = y.min(y_offset);
+
         state.offset = (x, y).into();
         state.size = Some(self.size);
         state.page_size = Some(area.into());
@@ -137,8 +149,11 @@ impl ScrollView {
     }
 
     fn render_vertical_scrollbar(&self, area: Rect, buf: &mut Buffer, state: &ScrollViewState) {
+        // Subtract height of visible area so the scroll thumb ends at the bottom of the track
+        let scrollbar_height = self.size.height as usize - area.height as usize;
+
         let mut scrollbar_state =
-            ScrollbarState::new(self.size.height as usize).position(state.offset.y as usize);
+            ScrollbarState::new(scrollbar_height).position(state.offset.y as usize);
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
         scrollbar.render(area, buf, &mut scrollbar_state);
     }
