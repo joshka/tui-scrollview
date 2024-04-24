@@ -116,25 +116,10 @@ impl StatefulWidget for ScrollView {
         // ensure that we don't scroll past the end of the buffer in either direction
         x = x.min(self.buf.area.width.saturating_sub(1));
         y = y.min(self.buf.area.height.saturating_sub(1));
-        let horizontal = if self.size.width <= area.width {
-            // no horizontal scrollbar, reset the x offset
-            x = 0;
-            None
-        } else {
-            Some(ScrollbarOrientation::HorizontalBottom)
-        };
-        let vertical = if self.size.height <= area.height {
-            // no vertical scrollbar, reset the y offset
-            y = 0;
-            None
-        } else {
-            Some(ScrollbarOrientation::VerticalRight)
-        };
-
-        let scrollbar_size = self.render_scrollbars(area, buf, state, horizontal, vertical);
         state.offset = (x, y).into();
         state.size = Some(self.size);
         state.page_size = Some(area.into());
+        let scrollbar_size = self.render_scrollbars(area, buf, state);
         let visible_area = Rect::new(
             x,
             y,
@@ -158,44 +143,32 @@ impl ScrollView {
 
     /// Render the horizontal and vertical scrollbars if exists,
     /// and return the size taken by the scrollbars
-    fn render_scrollbars(
-        &self,
-        area: Rect,
-        buf: &mut Buffer,
-        state: &ScrollViewState,
-        horizontal: Option<ScrollbarOrientation>,
-        vertical: Option<ScrollbarOrientation>,
-    ) -> Size {
-        let (pl, pt, pr, pb) = match (&horizontal, &vertical) {
-            (None, _) | (_, None) => (0, 0, 0, 0),
-            (
-                Some(ScrollbarOrientation::HorizontalBottom),
-                Some(ScrollbarOrientation::VerticalRight),
-            ) => (0, 0, 1, 1),
-            (
-                Some(ScrollbarOrientation::HorizontalTop),
-                Some(ScrollbarOrientation::VerticalRight),
-            ) => (0, 1, 1, 0),
-            (
-                Some(ScrollbarOrientation::HorizontalTop),
-                Some(ScrollbarOrientation::VerticalLeft),
-            ) => (1, 1, 0, 0),
-            (
-                Some(ScrollbarOrientation::HorizontalBottom),
-                Some(ScrollbarOrientation::VerticalLeft),
-            ) => (1, 0, 0, 1),
-            _ => panic!("Invalid scrollbar orientation combination"),
+    fn render_scrollbars(&self, area: Rect, buf: &mut Buffer, state: &mut ScrollViewState) -> Size {
+        let horizontal = if self.size.width <= area.width {
+            // no horizontal scrollbar, reset the x offset
+            state.offset.x = 0;
+            None
+        } else {
+            Some(ScrollbarOrientation::HorizontalBottom)
         };
-
+        let vertical = if self.size.height <= area.height {
+            // no vertical scrollbar, reset the y offset
+            state.offset.y = 0;
+            None
+        } else {
+            Some(ScrollbarOrientation::VerticalRight)
+        };
+        let (margin_horizontal, margin_vertical) =
+            (horizontal.is_some() as u16, vertical.is_some() as u16);
         Size {
             width: self.render_scrollbar(
-                Rect::new(area.x, area.y + pt, area.width, area.height - pb - pt),
+                Rect::new(area.x, area.y, area.width, area.height - margin_horizontal),
                 buf,
                 state,
                 vertical,
             ),
             height: self.render_scrollbar(
-                Rect::new(area.x + pl, area.y, area.width - pr - pl, area.height),
+                Rect::new(area.x, area.y, area.width - margin_vertical, area.height),
                 buf,
                 state,
                 horizontal,
