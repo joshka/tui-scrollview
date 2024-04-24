@@ -68,6 +68,8 @@ impl App {
                 Char('q') | Esc => self.quit(),
                 Char('j') | Down => self.scroll_view_state.scroll_down(),
                 Char('k') | Up => self.scroll_view_state.scroll_up(),
+                Char('h') | Left => self.scroll_view_state.scroll_left(),
+                Char('l') | Right => self.scroll_view_state.scroll_right(),
                 Char('f') | PageDown => self.scroll_view_state.scroll_page_down(),
                 Char('b') | PageUp => self.scroll_view_state.scroll_page_up(),
                 Char('g') | Home => self.scroll_view_state.scroll_to_top(),
@@ -91,7 +93,7 @@ impl Widget for &mut App {
 
         self.title().render(title, buf);
 
-        let mut scroll_view = ScrollView::new(Size::new(area.width, 100));
+        let mut scroll_view = ScrollView::new(Size::new(200, 100));
         self.render_widgets_into_scrollview(scroll_view.buf_mut());
         scroll_view.render(body, buf, &mut self.scroll_view_state)
     }
@@ -106,7 +108,7 @@ impl App {
         let keys_bg = palette.c600;
         Line::from(vec![
             "Tui-scrollview  ".into(),
-            "  ↓ | ↑ | PageDown | PageUp | Home | End  "
+            "  ↓ | ↑ | ← | → | PageDown | PageUp | Home | End  "
                 .fg(keys_fg)
                 .bg(keys_bg),
             "  Quit: ".into(),
@@ -118,9 +120,9 @@ impl App {
     fn render_widgets_into_scrollview(&self, buf: &mut Buffer) {
         use Constraint::*;
         let area = buf.area;
-        // the scrollview (currently) allocates the full width of the buffer, but overwrites the
-        // last column with a scrollbar. This means that we need to account for this when laying
-        // out the widgets
+        // The scrollview (currently) allocates the full width of the buffer,
+        // but last row and column might be used by scrollbars.
+        // This means that we need to account for this when laying out the widgets
         let [numbers, widgets, _scrollbar] =
             Layout::horizontal([Length(5), Fill(1), Length(1)]).areas(area);
         let [bar_charts, text_0, text_1, text_2] =
