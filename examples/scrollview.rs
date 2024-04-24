@@ -120,9 +120,9 @@ impl App {
     fn render_widgets_into_scrollview(&self, buf: &mut Buffer) {
         use Constraint::*;
         let area = buf.area;
-        // The scrollview (currently) allocates the full width of the buffer,
-        // but last row and column might be used by scrollbars.
-        // This means that we need to account for this when laying out the widgets
+        // The scrollview (currently) allocates the full width of the buffer, but last row and
+        // column might be used by scrollbars.
+        // This means that we need to account for this when laying out the widgets.
         let [numbers, widgets, _scrollbar] =
             Layout::horizontal([Length(5), Fill(1), Length(1)]).areas(area);
         let [bar_charts, text_0, text_1, text_2] =
