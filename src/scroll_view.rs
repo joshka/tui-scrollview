@@ -119,7 +119,13 @@ impl StatefulWidget for ScrollView {
         state.offset = (x, y).into();
         state.size = Some(self.size);
         state.page_size = Some(area.into());
-        let visible_area = Rect::new(x, y, area.width, area.height).intersection(self.buf.area);
+        let visible_area = Rect::new(
+            x,
+            y,
+            area.width.saturating_sub(1),
+            area.height.saturating_sub(1),
+        )
+        .intersection(self.buf.area);
         self.render_visible_area(area, buf, visible_area);
         // TODO work out whether to render the scrollbars or not
         self.render_vertical_scrollbar(area, buf, state);
