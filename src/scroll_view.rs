@@ -129,6 +129,7 @@ impl StatefulWidget for ScrollView {
         self.render_visible_area(area, buf, visible_area);
         // TODO work out whether to render the scrollbars or not
         self.render_vertical_scrollbar(area, buf, state);
+        self.render_horizontal_scrollbar(area, buf, state);
     }
 }
 
@@ -146,6 +147,13 @@ impl ScrollView {
         let mut scrollbar_state =
             ScrollbarState::new(self.size.height as usize).position(state.offset.y as usize);
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
+        scrollbar.render(area, buf, &mut scrollbar_state);
+    }
+
+    fn render_horizontal_scrollbar(&self, area: Rect, buf: &mut Buffer, state: &ScrollViewState) {
+        let mut scrollbar_state =
+            ScrollbarState::new(self.size.width as usize).position(state.offset.x as usize);
+        let scrollbar = Scrollbar::new(ScrollbarOrientation::HorizontalBottom);
         scrollbar.render(area, buf, &mut scrollbar_state);
     }
 }
