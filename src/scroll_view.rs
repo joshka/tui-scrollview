@@ -235,8 +235,8 @@ mod tests {
     use super::*;
     use ratatui::assert_buffer_eq;
 
-    fn init() -> (Buffer, ScrollView) {
-        let buf = Buffer::empty(Rect::new(0, 0, 10, 10));
+    fn init_with_buffer_size(size: Size) -> (Buffer, ScrollView) {
+        let buf = Buffer::empty(Rect::new(0, 0, size.width, size.height));
         let mut scroll_buffer = ScrollView::new(Size::new(20, 20));
         for y in 0..20 {
             for x in 0..20 {
@@ -249,23 +249,27 @@ mod tests {
         (buf, scroll_buffer)
     }
 
+    fn init() -> (Buffer, ScrollView) {
+        init_with_buffer_size(Size::new(10, 10))
+    }
+
     #[test]
     fn zero_offset() {
         let (mut buf, scroll_buffer) = init();
 
         let mut scroll_view_state = ScrollViewState::default();
-        scroll_buffer.render(Rect::new(2, 2, 5, 5), &mut buf, &mut scroll_view_state);
+        scroll_buffer.render(Rect::new(2, 2, 6, 6), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
                 "          ",
                 "          ",
-                "  ABCD▲   ",
-                "  UVWX█   ",
-                "  OPQR║   ",
-                "  IJKL║   ",
-                "  CDEF▼   ",
-                "          ",
+                "  ABCDE▲  ",
+                "  UVWXY█  ",
+                "  OPQRS║  ",
+                "  IJKLM║  ",
+                "  CDEFG▼  ",
+                "  ◄█══►   ",
                 "          ",
                 "          ",
             ])
@@ -276,20 +280,20 @@ mod tests {
     fn move_right() {
         let (mut buf, scroll_buffer) = init();
 
-        let mut scroll_view_state = ScrollViewState::default();
-        scroll_view_state.scroll_right();
-        scroll_buffer.render(Rect::new(2, 2, 5, 5), &mut buf, &mut scroll_view_state);
+        let mut scroll_view_state = ScrollViewState::with_offset((5, 0).into());
+
+        scroll_buffer.render(Rect::new(2, 2, 6, 6), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
                 "          ",
                 "          ",
-                "  BCDE▲   ",
-                "  VWXY█   ",
-                "  PQRS║   ",
-                "  JKLM║   ",
-                "  DEFG▼   ",
-                "          ",
+                "  FGHIJ▲  ",
+                "  ZABCD█  ",
+                "  TUVWX║  ",
+                "  NOPQR║  ",
+                "  HIJKL▼  ",
+                "  ◄═█═►   ",
                 "          ",
                 "          ",
             ])
@@ -300,21 +304,117 @@ mod tests {
     fn move_down() {
         let (mut buf, scroll_buffer) = init();
 
-        let mut scroll_view_state = ScrollViewState::with_offset((0, 1).into());
-        scroll_buffer.render(Rect::new(2, 2, 5, 5), &mut buf, &mut scroll_view_state);
+        let mut scroll_view_state = ScrollViewState::with_offset((0, 5).into());
+        scroll_buffer.render(Rect::new(2, 2, 6, 6), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
                 "          ",
                 "          ",
-                "  UVWX▲   ",
-                "  OPQR█   ",
-                "  IJKL║   ",
-                "  CDEF║   ",
-                "  WXYZ▼   ",
+                "  WXYZA▲  ",
+                "  QRSTU║  ",
+                "  KLMNO█  ",
+                "  EFGHI║  ",
+                "  YZABC▼  ",
+                "  ◄█══►   ",
+                "          ",
+                "          ",
+            ])
+        )
+    }
+
+    #[test]
+    fn hide_horizontal_scrollbar() {
+        let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(25, 10));
+        let mut scroll_view_state = ScrollViewState::new();
+        scroll_buffer.render(Rect::new(2, 2, 20, 6), &mut buf, &mut scroll_view_state);
+        assert_buffer_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "                         ",
+                "                         ",
+                "  ABCDEFGHIJKLMNOPQRS▲   ",
+                "  UVWXYZABCDEFGHIJKLM█   ",
+                "  OPQRSTUVWXYZABCDEFG║   ",
+                "  IJKLMNOPQRSTUVWXYZA║   ",
+                "  CDEFGHIJKLMNOPQRSTU║   ",
+                "  WXYZABCDEFGHIJKLMNO▼   ",
+                "                         ",
+                "                         ",
+            ])
+        )
+    }
+
+    #[test]
+    fn hide_vertical_scrollbar() {
+        let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(10, 25));
+        let mut scroll_view_state = ScrollViewState::new();
+        scroll_buffer.render(Rect::new(2, 2, 6, 20), &mut buf, &mut scroll_view_state);
+        assert_buffer_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "          ",
+                "          ",
+                "  ABCDEF  ",
+                "  UVWXYZ  ",
+                "  OPQRST  ",
+                "  IJKLMN  ",
+                "  CDEFGH  ",
+                "  WXYZAB  ",
+                "  QRSTUV  ",
+                "  KLMNOP  ",
+                "  EFGHIJ  ",
+                "  YZABCD  ",
+                "  STUVWX  ",
+                "  MNOPQR  ",
+                "  GHIJKL  ",
+                "  ABCDEF  ",
+                "  UVWXYZ  ",
+                "  OPQRST  ",
+                "  IJKLMN  ",
+                "  CDEFGH  ",
+                "  WXYZAB  ",
+                "  ◄█═══►  ",
                 "          ",
                 "          ",
                 "          ",
+            ])
+        )
+    }
+
+    #[test]
+    fn hide_both_scrollbar() {
+        let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(25, 25));
+        let mut scroll_view_state = ScrollViewState::new();
+        scroll_buffer.render(Rect::new(2, 2, 20, 20), &mut buf, &mut scroll_view_state);
+        assert_buffer_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "                         ",
+                "                         ",
+                "  ABCDEFGHIJKLMNOPQRST   ",
+                "  UVWXYZABCDEFGHIJKLMN   ",
+                "  OPQRSTUVWXYZABCDEFGH   ",
+                "  IJKLMNOPQRSTUVWXYZAB   ",
+                "  CDEFGHIJKLMNOPQRSTUV   ",
+                "  WXYZABCDEFGHIJKLMNOP   ",
+                "  QRSTUVWXYZABCDEFGHIJ   ",
+                "  KLMNOPQRSTUVWXYZABCD   ",
+                "  EFGHIJKLMNOPQRSTUVWX   ",
+                "  YZABCDEFGHIJKLMNOPQR   ",
+                "  STUVWXYZABCDEFGHIJKL   ",
+                "  MNOPQRSTUVWXYZABCDEF   ",
+                "  GHIJKLMNOPQRSTUVWXYZ   ",
+                "  ABCDEFGHIJKLMNOPQRST   ",
+                "  UVWXYZABCDEFGHIJKLMN   ",
+                "  OPQRSTUVWXYZABCDEFGH   ",
+                "  IJKLMNOPQRSTUVWXYZAB   ",
+                "  CDEFGHIJKLMNOPQRSTUV   ",
+                "  WXYZABCDEFGHIJKLMNOP   ",
+                "  QRSTUVWXYZABCDEFGHIJ   ",
+                "                         ",
+                "                         ",
+                "                         ",
             ])
         )
     }
