@@ -1,4 +1,8 @@
-use ratatui::{layout::Size, prelude::*, widgets::*};
+use ratatui::{
+    layout::{Position, Size},
+    prelude::*,
+    widgets::*,
+};
 
 use crate::ScrollViewState;
 
@@ -144,19 +148,29 @@ impl ScrollView {
     /// Render the horizontal and vertical scrollbars if exists,
     /// and return the size taken by the scrollbars
     fn render_scrollbars(&self, area: Rect, buf: &mut Buffer, state: &mut ScrollViewState) -> Size {
-        let horizontal = if self.size.width < area.width {
-            // no horizontal scrollbar, reset the x offset
-            state.offset.x = 0;
-            None
-        } else {
-            Some(ScrollbarOrientation::HorizontalBottom)
-        };
-        let vertical = if self.size.height < area.height {
-            // no vertical scrollbar, reset the y offset
-            state.offset.y = 0;
-            None
-        } else {
-            Some(ScrollbarOrientation::VerticalRight)
+        let (horizontal, vertical) = match (
+            self.size.width as i32 - area.width as i32,
+            self.size.height as i32 - area.height as i32,
+        ) {
+            (dw, dh) if dw <= 0 && dh <= 0 => {
+                // Perfect fit
+                state.offset = Position::default();
+                (None, None)
+            }
+            (dw, dh) if dw < 0 && dh > 0 => {
+                // No horizontal bar, but with vertical bar taking last column
+                state.offset.x = 0;
+                (None, Some(ScrollbarOrientation::VerticalRight))
+            }
+            (dw, dh) if dh < 0 && dw > 0 => {
+                // No horizontal bar, but with vertical bar taking last column
+                state.offset.y = 0;
+                (Some(ScrollbarOrientation::HorizontalBottom), None)
+            }
+            _ => (
+                Some(ScrollbarOrientation::HorizontalBottom),
+                Some(ScrollbarOrientation::VerticalRight),
+            ),
         };
         let (margin_horizontal, margin_vertical) =
             (horizontal.is_some() as u16, vertical.is_some() as u16);
@@ -359,7 +373,7 @@ mod tests {
     fn hiding_both_scrollbar() {
         let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(25, 25));
         let mut scroll_view_state = ScrollViewState::new();
-        scroll_buffer.render(Rect::new(2, 2, 21, 21), &mut buf, &mut scroll_view_state);
+        scroll_buffer.render(Rect::new(2, 2, 20, 20), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
