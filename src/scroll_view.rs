@@ -144,14 +144,14 @@ impl ScrollView {
     /// Render the horizontal and vertical scrollbars if exists,
     /// and return the size taken by the scrollbars
     fn render_scrollbars(&self, area: Rect, buf: &mut Buffer, state: &mut ScrollViewState) -> Size {
-        let horizontal = if self.size.width <= area.width {
+        let horizontal = if self.size.width < area.width {
             // no horizontal scrollbar, reset the x offset
             state.offset.x = 0;
             None
         } else {
             Some(ScrollbarOrientation::HorizontalBottom)
         };
-        let vertical = if self.size.height <= area.height {
+        let vertical = if self.size.height < area.height {
             // no vertical scrollbar, reset the y offset
             state.offset.y = 0;
             None
@@ -297,7 +297,7 @@ mod tests {
     }
 
     #[test]
-    fn hide_horizontal_scrollbar() {
+    fn not_hiding_horizontal_scrollbar() {
         let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(25, 10));
         let mut scroll_view_state = ScrollViewState::new();
         scroll_buffer.render(Rect::new(2, 2, 20, 6), &mut buf, &mut scroll_view_state);
@@ -310,8 +310,8 @@ mod tests {
                 "  UVWXYZABCDEFGHIJKLM█   ",
                 "  OPQRSTUVWXYZABCDEFG║   ",
                 "  IJKLMNOPQRSTUVWXYZA║   ",
-                "  CDEFGHIJKLMNOPQRSTU║   ",
-                "  WXYZABCDEFGHIJKLMNO▼   ",
+                "  CDEFGHIJKLMNOPQRSTU▼   ",
+                "  ◄█████████════════►    ",
                 "                         ",
                 "                         ",
             ])
@@ -319,10 +319,10 @@ mod tests {
     }
 
     #[test]
-    fn hide_vertical_scrollbar() {
+    fn hiding_vertical_scrollbar() {
         let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(10, 25));
         let mut scroll_view_state = ScrollViewState::new();
-        scroll_buffer.render(Rect::new(2, 2, 6, 20), &mut buf, &mut scroll_view_state);
+        scroll_buffer.render(Rect::new(2, 2, 6, 21), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
@@ -347,8 +347,8 @@ mod tests {
                 "  IJKLMN  ",
                 "  CDEFGH  ",
                 "  WXYZAB  ",
+                "  QRSTUV  ",
                 "  ◄█═══►  ",
-                "          ",
                 "          ",
                 "          ",
             ])
@@ -356,10 +356,10 @@ mod tests {
     }
 
     #[test]
-    fn hide_both_scrollbar() {
+    fn hiding_both_scrollbar() {
         let (mut buf, scroll_buffer) = init_with_buffer_size(Size::new(25, 25));
         let mut scroll_view_state = ScrollViewState::new();
-        scroll_buffer.render(Rect::new(2, 2, 20, 20), &mut buf, &mut scroll_view_state);
+        scroll_buffer.render(Rect::new(2, 2, 21, 21), &mut buf, &mut scroll_view_state);
         assert_buffer_eq!(
             buf,
             Buffer::with_lines(vec![
