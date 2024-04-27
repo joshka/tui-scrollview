@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use ratatui::{
     layout::{Position, Size},
     prelude::*,
@@ -121,16 +123,11 @@ impl StatefulWidget for ScrollView {
         // ensure that we don't scroll past the end of the buffer in either direction
         // also, ensure that the scrolling stops with the end of the content at the
         // bottom of the visible area
-        let max_y_offset = self.size.height - area.height;
+        let max_y_offset = self.buf.area.height - area.height;
         let next_y_offset = y.min(self.buf.area.height.saturating_sub(1));
-        let y_offset = if next_y_offset > max_y_offset {
-            max_y_offset
-        } else {
-            next_y_offset
-        };
 
         x = x.min(self.buf.area.width.saturating_sub(1));
-        y = y.min(y_offset);
+        y = y.min(min(next_y_offset, max_y_offset));
 
         state.offset = (x, y).into();
         state.size = Some(self.size);
@@ -249,6 +246,60 @@ mod tests {
             }
         }
         scroll_view
+    }
+
+    /// Initialize a buffer and a scroll view with a buffer size of 5x10
+    ///
+    /// Each row is filled with the number of the row in a 5x10 grid
+    ///
+    ///
+    /// ```plain
+    /// 00000
+    /// 11111
+    /// 22222
+    /// 33333
+    /// 44444
+    /// 55555
+    /// 66666
+    /// 77777
+    /// 88888
+    /// 99999
+    /// ```
+    #[fixture]
+    fn scroll_view_numerical_test_data() -> ScrollView {
+        let mut scroll_view = ScrollView::new(Size::new(5, 10));
+        for y in 0..10 {
+            for x in 0..5 {
+                let widget = Span::raw(format!("{y}"));
+                println!("{widget}");
+                let area = Rect::new(x as u16, y as u16, 1, 1);
+                scroll_view.render_widget(widget, area);
+            }
+        }
+
+        scroll_view
+    }
+
+    #[rstest]
+    fn scroll_to_bottom(scroll_view_numerical_test_data: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut scroll_view_state = ScrollViewState::new();
+
+        scroll_view_state.scroll_to_bottom();
+
+        scroll_view_numerical_test_data.render(buf.area, &mut buf, &mut scroll_view_state);
+
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "44444▲", 
+                "55555║", 
+                "66666█", 
+                "77777█", 
+                "88888█", 
+                "99999▼",
+            ])
+        )
     }
 
     #[rstest]
