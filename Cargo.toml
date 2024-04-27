@@ -1,6 +1,6 @@
 [package]
 name = "tui-scrollview"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Joshka"]
 description = "A simple scrollable view for Ratatui"
 license = "MIT OR Apache-2.0"
@@ -12,6 +12,7 @@ edition = "2021"
 [dependencies]
 indoc = "2.0.5"
 ratatui = "0.26.2"
+rstest = "0.19.0"
 
 [dev-dependencies]
 color-eyre = "0.6.3"
