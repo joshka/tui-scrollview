@@ -1,3 +1,5 @@
+use std::cmp::min;
+
 use ratatui::{
     layout::{Position, Size},
     prelude::*,
@@ -117,9 +119,16 @@ impl StatefulWidget for ScrollView {
 
     fn render(self, area: Rect, buf: &mut Buffer, state: &mut Self::State) {
         let (mut x, mut y) = state.offset.into();
+
         // ensure that we don't scroll past the end of the buffer in either direction
+        // also, ensure that the scrolling stops with the end of the content at the
+        // bottom of the visible area
+        let max_y_offset = self.buf.area.height - area.height;
+        let next_y_offset = y.min(self.buf.area.height.saturating_sub(1));
+
         x = x.min(self.buf.area.width.saturating_sub(1));
-        y = y.min(self.buf.area.height.saturating_sub(1));
+        y = y.min(min(next_y_offset, max_y_offset));
+
         state.offset = (x, y).into();
         state.size = Some(self.size);
         state.page_size = Some(area.into());
@@ -141,19 +150,19 @@ impl ScrollView {
             (0, 0) => {
                 // area is taller and wider than the scroll_view
                 state.offset = Position::default();
-                return Rect::new(state.offset.x, state.offset.y, area.width, area.height);
+                Rect::new(state.offset.x, state.offset.y, area.width, area.height)
             }
             (_, 0) if area.height > size.height => {
                 // area is taller and narrower than the scroll_view
                 state.offset.y = 0;
                 self.render_horizontal_scrollbar(area, buf, state);
-                return Rect::new(state.offset.x, 0, area.width, area.height - 1);
+                Rect::new(state.offset.x, 0, area.width, area.height - 1)
             }
             (0, _) if area.width > size.width => {
                 // area is wider and shorter than the scroll_view
                 state.offset.x = 0;
                 self.render_vertical_scrollbar(area, buf, state);
-                return Rect::new(0, state.offset.y, area.width - 1, area.height);
+                Rect::new(0, state.offset.y, area.width - 1, area.height)
             }
             (_, _) => {
                 // scroll_view is both wider and taller than the area
@@ -167,19 +176,22 @@ impl ScrollView {
                 };
                 self.render_vertical_scrollbar(vertical_area, buf, state);
                 self.render_horizontal_scrollbar(horizontal_area, buf, state);
-                return Rect::new(
+                Rect::new(
                     state.offset.x,
                     state.offset.y,
                     area.width - 1,
                     area.height - 1,
-                );
+                )
             }
         }
     }
 
     fn render_vertical_scrollbar(&self, area: Rect, buf: &mut Buffer, state: &ScrollViewState) {
+        // Subtract height of visible area so the scroll thumb ends at the bottom of the track
+        let scrollbar_height = self.size.height as usize - area.height as usize;
+
         let mut scrollbar_state =
-            ScrollbarState::new(self.size.height as usize).position(state.offset.y as usize);
+            ScrollbarState::new(scrollbar_height).position(state.offset.y as usize);
         let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
         scrollbar.render(area, buf, &mut scrollbar_state);
     }
@@ -234,6 +246,60 @@ mod tests {
             }
         }
         scroll_view
+    }
+
+    /// Initialize a buffer and a scroll view with a buffer size of 5x10
+    ///
+    /// Each row is filled with the number of the row in a 5x10 grid
+    ///
+    ///
+    /// ```plain
+    /// 00000
+    /// 11111
+    /// 22222
+    /// 33333
+    /// 44444
+    /// 55555
+    /// 66666
+    /// 77777
+    /// 88888
+    /// 99999
+    /// ```
+    #[fixture]
+    fn scroll_view_numerical_test_data() -> ScrollView {
+        let mut scroll_view = ScrollView::new(Size::new(5, 10));
+        for y in 0..10 {
+            for x in 0..5 {
+                let widget = Span::raw(format!("{y}"));
+                println!("{widget}");
+                let area = Rect::new(x as u16, y as u16, 1, 1);
+                scroll_view.render_widget(widget, area);
+            }
+        }
+
+        scroll_view
+    }
+
+    #[rstest]
+    fn scroll_to_bottom(scroll_view_numerical_test_data: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut scroll_view_state = ScrollViewState::new();
+
+        scroll_view_state.scroll_to_bottom();
+
+        scroll_view_numerical_test_data.render(buf.area, &mut buf, &mut scroll_view_state);
+
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "44444▲",
+                "55555║",
+                "66666█",
+                "77777█",
+                "88888█",
+                "99999▼",
+            ])
+        )
     }
 
     #[rstest]
