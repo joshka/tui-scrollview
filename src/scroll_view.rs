@@ -123,7 +123,7 @@ impl StatefulWidget for ScrollView {
         // ensure that we don't scroll past the end of the buffer in either direction
         // also, ensure that the scrolling stops with the end of the content at the
         // bottom of the visible area
-        let max_y_offset = self.buf.area.height - area.height;
+        let max_y_offset = self.buf.area.height.saturating_sub(area.height);
         let next_y_offset = y.min(self.buf.area.height.saturating_sub(1));
 
         x = x.min(self.buf.area.width.saturating_sub(1));
@@ -215,89 +215,60 @@ impl ScrollView {
 
 #[cfg(test)]
 mod tests {
+    use std::iter::zip;
+
     use super::*;
     use rstest::{fixture, rstest};
 
     /// Initialize a buffer and a scroll view with a buffer size of 10x10
     ///
-    /// The buffer will be filled with characters from A to Z in a 10x10 grid
+    /// The buffer will be filled with characters that make it easy to see if the scroll view is
+    /// rendering the correct area of the buffer.
     ///
     /// ```plain
-    /// ABCDEFGHIJ
-    /// KLMNOPQRST
-    /// UVWXYZABCD
-    /// EFGHIJKLMN
-    /// OPQRSTUVWX
-    /// YZABCDEFGH
-    /// IJKLMNOPQR
-    /// STUVWXYZAB
-    /// CDEFGHIJKL
-    /// MNOPQRSTUV
+    /// a0a1a2a3a4
+    /// b0b1b2b3b4
+    /// c0c1c2c3c4
+    /// d0d1d2d3d4
+    /// e0e1e2e3e4
+    /// f0f1f2f3f4
+    /// g0g1g2g3g4
+    /// h0h1h2h3h4
+    /// i0i1i2i3i4
+    /// j0j1j2j3j4
     /// ```
     #[fixture]
     fn scroll_view() -> ScrollView {
         let mut scroll_view = ScrollView::new(Size::new(10, 10));
-        for y in 0..10 {
-            for x in 0..10 {
-                let c = char::from_u32((x + y * 10) % 26 + 65).unwrap();
-                let widget = Span::raw(format!("{c}"));
-                let area = Rect::new(x as u16, y as u16, 1, 1);
-                scroll_view.render_widget(widget, area);
-            }
-        }
-        scroll_view
-    }
-
-    /// Initialize a buffer and a scroll view with a buffer size of 5x10
-    ///
-    /// Each row is filled with the number of the row in a 5x10 grid
-    ///
-    ///
-    /// ```plain
-    /// 00000
-    /// 11111
-    /// 22222
-    /// 33333
-    /// 44444
-    /// 55555
-    /// 66666
-    /// 77777
-    /// 88888
-    /// 99999
-    /// ```
-    #[fixture]
-    fn scroll_view_numerical_test_data() -> ScrollView {
-        let mut scroll_view = ScrollView::new(Size::new(5, 10));
-        for y in 0..10 {
+        for (y, c) in zip(0..10, 'a'..'k') {
             for x in 0..5 {
-                let widget = Span::raw(format!("{y}"));
-                println!("{widget}");
-                let area = Rect::new(x as u16, y as u16, 1, 1);
+                // let c = char::from_u32((x + y * 10) % 26 + 65).unwrap();
+                let widget = Span::raw(format!("{c}{x}"));
+                let area = Rect::new(x * 2 as u16, y as u16, 2, 1);
                 scroll_view.render_widget(widget, area);
             }
         }
-
         scroll_view
     }
 
     #[rstest]
-    fn scroll_to_bottom(scroll_view_numerical_test_data: ScrollView) {
-        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
-        let mut scroll_view_state = ScrollViewState::new();
-
-        scroll_view_state.scroll_to_bottom();
-
-        scroll_view_numerical_test_data.render(buf.area, &mut buf, &mut scroll_view_state);
-
+    fn full_size_does_not_show_scrollbars(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 10, 10));
+        let mut state = ScrollViewState::new();
+        scroll_view.render(buf.area, &mut buf, &mut state);
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "44444▲",
-                "55555║",
-                "66666█",
-                "77777█",
-                "88888█",
-                "99999▼",
+                "a0a1a2a3a4",
+                "b0b1b2b3b4",
+                "c0c1c2c3c4",
+                "d0d1d2d3d4",
+                "e0e1e2e3e4",
+                "f0f1f2f3f4",
+                "g0g1g2g3g4",
+                "h0h1h2h3h4",
+                "i0i1i2i3i4",
+                "j0j1j2j3j4",
             ])
         )
     }
@@ -310,11 +281,11 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDE▲",
-                "KLMNO█",
-                "UVWXY║",
-                "EFGHI║",
-                "OPQRS▼",
+                "a0a1a▲",
+                "b0b1b█",
+                "c0c1c█",
+                "d0d1d║",
+                "e0e1e▼",
                 "◄█══► ",
             ])
         )
@@ -325,14 +296,53 @@ mod tests {
         let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
         let mut state = ScrollViewState::with_offset((3, 0).into());
         scroll_view.render(buf.area, &mut buf, &mut state);
+        // first row is a0a1a2a3a4, so we should see 1a2a3 when scrolled right by 3
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "DEFGH▲",
-                "NOPQR█",
-                "XYZAB║",
-                "HIJKL║",
-                "RSTUV▼",
+                "1a2a3▲",
+                "1b2b3█",
+                "1c2c3█",
+                "1d2d3║",
+                "1e2e3▼",
+                "◄═█═► ",
+            ])
+        )
+    }
+
+    #[rstest]
+    fn move_right_to_last_position(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut state = ScrollViewState::with_offset((5, 0).into());
+        scroll_view.render(buf.area, &mut buf, &mut state);
+        // a0a1a2a3a4 is the first row, so we should see 2a3a4 when scrolled right by 5
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "2a3a4▲",
+                "2b3b4█",
+                "2c3c4█",
+                "2d3d4║",
+                "2e3e4▼",
+                "◄═█═► ",
+            ])
+        )
+    }
+
+    #[rstest]
+    fn move_right_past_last_position(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut state = ScrollViewState::with_offset((6, 0).into());
+        scroll_view.render(buf.area, &mut buf, &mut state);
+        // a0a1a2a3a4 is the first row, so we should see 2a3a4 when scrolled right by 5 if clamped
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "2a3a4▲",
+                "2b3b4█",
+                "2c3c4█",
+                "2d3d4║",
+                "2e3e4▼",
                 "◄═█═► ",
             ])
         )
@@ -346,34 +356,90 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "EFGHI▲",
-                "OPQRS║",
-                "YZABC█",
-                "IJKLM║",
-                "STUVW▼",
+                "d0d1d▲",
+                "e0e1e║",
+                "f0f1f█",
+                "g0g1g█",
+                "h0h1h▼",
                 "◄█══► ",
             ])
         )
     }
 
     #[rstest]
-    fn hides_both_scrollbars(scroll_view: ScrollView) {
-        let mut buf = Buffer::empty(Rect::new(0, 0, 10, 10));
-        let mut state = ScrollViewState::new();
+    fn move_down_to_last_position(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut state = ScrollViewState::with_offset((0, 5).into());
         scroll_view.render(buf.area, &mut buf, &mut state);
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDEFGHIJ",
-                "KLMNOPQRST",
-                "UVWXYZABCD",
-                "EFGHIJKLMN",
-                "OPQRSTUVWX",
-                "YZABCDEFGH",
-                "IJKLMNOPQR",
-                "STUVWXYZAB",
-                "CDEFGHIJKL",
-                "MNOPQRSTUV",
+                "f0f1f▲",
+                "g0g1g║",
+                "h0h1h█",
+                "i0i1i█",
+                "j0j1j▼",
+                "◄█══► ",
+            ])
+        )
+    }
+
+    #[rstest]
+    fn move_down_past_last_position(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 6, 6));
+        let mut state = ScrollViewState::with_offset((0, 6).into());
+        scroll_view.render(buf.area, &mut buf, &mut state);
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "f0f1f▲",
+                "g0g1g║",
+                "h0h1h█",
+                "i0i1i█",
+                "j0j1j▼",
+                "◄█══► ",
+            ])
+        )
+    }
+
+    #[rstest]
+    fn move_down_to_last_position_with_no_horizontal_bar(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 11, 5));
+        let mut scroll_view_state = ScrollViewState::with_offset((0, 5).into());
+
+        scroll_view_state.scroll_to_bottom();
+
+        scroll_view.render(buf.area, &mut buf, &mut scroll_view_state);
+
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "f0f1f2f3f4▲",
+                "g0g1g2g3g4║",
+                "h0h1h2h3h4█",
+                "i0i1i2i3i4█",
+                "j0j1j2j3j4▼",
+            ])
+        )
+    }
+
+    #[rstest]
+    fn move_down_past_last_position_with_no_horizontal_bar(scroll_view: ScrollView) {
+        let mut buf = Buffer::empty(Rect::new(0, 0, 11, 5));
+        let mut scroll_view_state = ScrollViewState::with_offset((0, 6).into());
+
+        scroll_view_state.scroll_to_bottom();
+
+        scroll_view.render(buf.area, &mut buf, &mut scroll_view_state);
+
+        assert_eq!(
+            buf,
+            Buffer::with_lines(vec![
+                "f0f1f2f3f4▲",
+                "g0g1g2g3g4║",
+                "h0h1h2h3h4█",
+                "i0i1i2i3i4█",
+                "j0j1j2j3j4▼",
             ])
         )
     }
@@ -386,15 +452,15 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDEFGHIJ▲",
-                "KLMNOPQRST█",
-                "UVWXYZABCD█",
-                "EFGHIJKLMN█",
-                "OPQRSTUVWX█",
-                "YZABCDEFGH║",
-                "IJKLMNOPQR║",
-                "STUVWXYZAB║",
-                "CDEFGHIJKL▼",
+                "a0a1a2a3a4▲",
+                "b0b1b2b3b4█",
+                "c0c1c2c3c4█",
+                "d0d1d2d3d4█",
+                "e0e1e2e3e4█",
+                "f0f1f2f3f4█",
+                "g0g1g2g3g4█",
+                "h0h1h2h3h4█",
+                "i0i1i2i3i4▼",
             ])
         )
     }
@@ -407,16 +473,16 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDEFGHI",
-                "KLMNOPQRS",
-                "UVWXYZABC",
-                "EFGHIJKLM",
-                "OPQRSTUVW",
-                "YZABCDEFG",
-                "IJKLMNOPQ",
-                "STUVWXYZA",
-                "CDEFGHIJK",
-                "MNOPQRSTU",
+                "a0a1a2a3a",
+                "b0b1b2b3b",
+                "c0c1c2c3c",
+                "d0d1d2d3d",
+                "e0e1e2e3e",
+                "f0f1f2f3f",
+                "g0g1g2g3g",
+                "h0h1h2h3h",
+                "i0i1i2i3i",
+                "j0j1j2j3j",
                 "◄████═══►",
             ])
         )
@@ -432,14 +498,14 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDEFGHI▲",
-                "KLMNOPQRS█",
-                "UVWXYZABC█",
-                "EFGHIJKLM█",
-                "OPQRSTUVW║",
-                "YZABCDEFG║",
-                "IJKLMNOPQ║",
-                "STUVWXYZA▼",
+                "a0a1a2a3a▲",
+                "b0b1b2b3b█",
+                "c0c1c2c3c█",
+                "d0d1d2d3d█",
+                "e0e1e2e3e█",
+                "f0f1f2f3f█",
+                "g0g1g2g3g║",
+                "h0h1h2h3h▼",
                 "◄████═══► ",
             ])
         )
@@ -455,15 +521,15 @@ mod tests {
         assert_eq!(
             buf,
             Buffer::with_lines(vec![
-                "ABCDEFGH▲",
-                "KLMNOPQR█",
-                "UVWXYZAB█",
-                "EFGHIJKL█",
-                "OPQRSTUV█",
-                "YZABCDEF║",
-                "IJKLMNOP║",
-                "STUVWXYZ║",
-                "CDEFGHIJ▼",
+                "a0a1a2a3▲",
+                "b0b1b2b3█",
+                "c0c1c2c3█",
+                "d0d1d2d3█",
+                "e0e1e2e3█",
+                "f0f1f2f3█",
+                "g0g1g2g3█",
+                "h0h1h2h3█",
+                "i0i1i2i3▼",
                 "◄███═══► ",
             ])
         )
@@ -485,13 +551,13 @@ mod tests {
                 "                    ",
                 "                    ",
                 "                    ",
-                "     RSTUVW▲        ",
-                "     BCDEFG║        ",
-                "     LMNOPQ█        ",
-                "     VWXYZA█        ",
-                "     FGHIJK║        ",
-                "     PQRSTU║        ",
-                "           ▼        ",
+                "     1c2c3c▲        ",
+                "     1d2d3d║        ",
+                "     1e2e3e█        ",
+                "     1f2f3f█        ",
+                "     1g2g3g█        ",
+                "     1h2h3h█        ",
+                "     1i2i3i▼        ",
                 "     ◄═█══►         ",
                 "                    ",
                 "                    ",
